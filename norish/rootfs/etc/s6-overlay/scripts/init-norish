@@ -90,7 +90,12 @@ rm -f "${PG_DATA}/postmaster.pid"
 # ------------------------------------------------------------------ env file
 {
     printf 'export NODE_ENV=%q\n' "production"
-    printf 'export HOST=%q\n' "0.0.0.0"
+    # Bind dual-stack (IPv4 + IPv6). Home Assistant publishes the port on both
+    # families. Clients that resolve "homeassistant.local" over mDNS get an
+    # IPv6 (link-local) address first; with an IPv4-only bind the published
+    # IPv6 side accepts the connection and then resets it without sending a
+    # single byte (browser error NS_ERROR_NET_EMPTY_RESPONSE).
+    printf 'export HOST=%q\n' "::"
     printf 'export PORT=%q\n' "3000"
     printf 'export AUTH_URL=%q\n' "${AUTH_URL}"
     printf 'export DATABASE_URL=%q\n' "postgres://postgres@127.0.0.1:5432/norish"
