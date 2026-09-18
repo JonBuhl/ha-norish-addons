@@ -1,0 +1,8 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+bashio::log.info "Starting PostgreSQL"
+exec su-exec postgres /usr/libexec/postgresql17/postgres \
+    -D /data/postgres \
+    -c listen_addresses=127.0.0.1 \
+    -c unix_socket_directories=/run/postgresql \
+    -c log_min_messages=warning

@@ -1,0 +1,10 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# The Norish admin UI can request a restart by exiting; s6 restarts the
+# service. A crash loop is rate limited by the sleep below.
+if [[ "${1}" -eq 0 ]]; then
+    bashio::log.info "Norish exited cleanly, restarting"
+else
+    bashio::log.warning "Norish exited with code ${1}, restarting in 5s"
+    sleep 5
+fi

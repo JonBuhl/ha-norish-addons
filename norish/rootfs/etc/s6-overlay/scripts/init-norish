@@ -1,0 +1,122 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# Runs once per container start, before the services: directories, master
+# key, PostgreSQL cluster and the environment file consumed by the norish
+# service.
+set -euo pipefail
+
+ENV_FILE=/run/norish.env
+PG_BIN=/usr/libexec/postgresql17
+PG_DATA=/data/postgres
+
+bashio::log.info "Preparing Norish add-on (upstream ${NORISH_UPSTREAM_VERSION:-unknown})"
+
+mkdir -p /data/uploads /data/redis "${PG_DATA}" /run/postgresql
+chown -R node:node /data/uploads /app/bin
+chown -R redis:redis /data/redis
+chown -R postgres:postgres "${PG_DATA}" /run/postgresql
+chmod 700 "${PG_DATA}"
+
+# ---------------------------------------------------------------- master key
+# The key derives the encryption keys of Norish. It must stay stable forever,
+# so it is persisted in /data (part of Home Assistant backups). An explicit
+# option value always wins, e.g. when migrating an existing Docker install.
+MASTER_KEY=""
+if bashio::config.has_value 'master_key'; then
+    MASTER_KEY="$(bashio::config 'master_key')"
+    bashio::log.info "Using MASTER_KEY from add-on options"
+elif [[ -s /data/master_key ]]; then
+    MASTER_KEY="$(cat /data/master_key)"
+else
+    MASTER_KEY="$(head -c 32 /dev/urandom | base64 | tr -d '\n')"
+    (umask 077 && printf '%s' "${MASTER_KEY}" > /data/master_key)
+    bashio::log.warning "Generated a new MASTER_KEY and stored it in /data/master_key."
+    bashio::log.warning "Keep your Home Assistant backups: without this key encrypted data is lost."
+fi
+
+# ------------------------------------------------------------------ AUTH_URL
+AUTH_URL=""
+if bashio::config.has_value 'auth_url'; then
+    AUTH_URL="$(bashio::config 'auth_url')"
+else
+    # Best effort: first IPv4 address of the host as reported by Supervisor.
+    ip="$(bashio::network.ipv4_address 2>/dev/null | head -n1 | cut -d/ -f1 || true)"
+    if [[ -n "${ip}" ]]; then
+        AUTH_URL="http://${ip}:3000"
+        bashio::log.info "auth_url not set, derived ${AUTH_URL} from the host IP"
+    else
+        AUTH_URL="http://localhost:3000"
+        bashio::log.warning "auth_url not set and host IP unknown, falling back to ${AUTH_URL}."
+        bashio::log.warning "Set auth_url in the add-on options to the URL you open Norish with."
+    fi
+fi
+AUTH_URL="${AUTH_URL%/}"
+
+TRUSTED_ORIGINS=""
+if bashio::config.has_value 'trusted_origins'; then
+    TRUSTED_ORIGINS="$(bashio::config 'trusted_origins' | paste -sd, -)"
+fi
+
+# ------------------------------------------------------------------ Obscura
+# The Obscura add-on lives in the same repository, so its hostname is the
+# hostname of this add-on with the slug swapped:
+#   "<repo>-norish"  ->  "<repo>-norish-obscura"
+OBSCURA_ENDPOINT=""
+if bashio::config.has_value 'obscura_endpoint'; then
+    OBSCURA_ENDPOINT="$(bashio::config 'obscura_endpoint')"
+else
+    self_host="$(hostname)"
+    OBSCURA_ENDPOINT="ws://${self_host%-norish}-norish-obscura:9222"
+    bashio::log.info "Using Obscura at ${OBSCURA_ENDPOINT} (install the Norish Obscura add-on for URL imports)"
+fi
+
+# --------------------------------------------------------------- PostgreSQL
+if [[ ! -s "${PG_DATA}/PG_VERSION" ]]; then
+    bashio::log.info "Initialising PostgreSQL cluster in ${PG_DATA}"
+    su-exec postgres "${PG_BIN}/initdb" \
+        --pgdata="${PG_DATA}" \
+        --username=postgres \
+        --auth-local=trust \
+        --auth-host=trust \
+        --encoding=UTF8 \
+        --locale=C.UTF-8 \
+        >/dev/null
+else
+    bashio::log.info "PostgreSQL cluster found (major version $(cat "${PG_DATA}/PG_VERSION"))"
+fi
+# Recover from an unclean shutdown (e.g. power loss on the Pi).
+rm -f "${PG_DATA}/postmaster.pid"
+
+# ------------------------------------------------------------------ env file
+{
+    printf 'export NODE_ENV=%q\n' "production"
+    printf 'export HOST=%q\n' "0.0.0.0"
+    printf 'export PORT=%q\n' "3000"
+    printf 'export AUTH_URL=%q\n' "${AUTH_URL}"
+    printf 'export DATABASE_URL=%q\n' "postgres://postgres@127.0.0.1:5432/norish"
+    printf 'export REDIS_URL=%q\n' "redis://127.0.0.1:6379"
+    printf 'export MASTER_KEY=%q\n' "${MASTER_KEY}"
+    printf 'export OBSCURA_ENDPOINT=%q\n' "${OBSCURA_ENDPOINT}"
+    printf 'export UPLOADS_DIR=%q\n' "/data/uploads"
+    printf 'export YT_DLP_BIN_DIR=%q\n' "/app/bin"
+    printf 'export NEXT_PUBLIC_LOG_LEVEL=%q\n' "$(bashio::config 'log_level')"
+    printf 'export PASSWORD_AUTH_ENABLED=%q\n' "$(bashio::config 'password_auth_enabled')"
+    printf 'export DEFAULT_LOCALE=%q\n' "$(bashio::config 'default_locale')"
+    if bashio::config.has_value 'enabled_locales'; then
+        printf 'export ENABLED_LOCALES=%q\n' "$(bashio::config 'enabled_locales')"
+    fi
+    if [[ -n "${TRUSTED_ORIGINS}" ]]; then
+        printf 'export TRUSTED_ORIGINS=%q\n' "${TRUSTED_ORIGINS}"
+    fi
+    # Free-form extra variables (OIDC, AI keys, limits, ...).
+    if bashio::config.has_value 'env_vars'; then
+        for idx in $(bashio::config 'env_vars|keys'); do
+            name="$(bashio::config "env_vars[${idx}].name")"
+            value="$(bashio::config "env_vars[${idx}].value")"
+            printf 'export %s=%q\n' "${name}" "${value}"
+        done
+    fi
+} > "${ENV_FILE}"
+chmod 600 "${ENV_FILE}"
+
+bashio::log.info "AUTH_URL=${AUTH_URL}"

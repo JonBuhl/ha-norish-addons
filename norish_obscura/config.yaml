@@ -1,0 +1,19 @@
+name: Norish Obscura
+version: "0.2.0-norish.1"
+slug: norish_obscura
+description: Headless browser used by Norish to render recipe pages for URL imports
+url: https://github.com/jonbuhl/ha-norish-addons
+arch:
+  - aarch64
+  - amd64
+# Upstream image used unchanged. The tag is pinned by docker/obscura/pin.env in
+# the Norish repository and updated automatically by
+# .github/workflows/update-upstream.yml together with the Norish add-on.
+image: norishapp/obscura
+init: false
+startup: services
+boot: auto
+# No host port on purpose: anyone who can reach the CDP port can drive the
+# browser. The Norish add-on reaches it over the internal add-on network.
+options: {}
+schema: {}

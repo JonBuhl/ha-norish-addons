@@ -1,0 +1,78 @@
+name: Build Norish add-on image
+description: Builds and pushes the multi-arch add-on image using version and image name from norish/config.yaml
+inputs:
+  force:
+    description: Rebuild even if the tag already exists in the registry
+    required: false
+    default: "false"
+  token:
+    description: Token with packages:write
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Read add-on metadata
+      id: meta
+      shell: bash
+      run: |
+        set -euo pipefail
+        version="$(yq -r '.version' norish/config.yaml)"
+        image="$(yq -r '.image' norish/config.yaml)"
+        norish_tag="$(sed -n 's/^ARG NORISH_VERSION=\(.*\)$/\1/p' norish/Dockerfile | head -n1)"
+        if [[ "${image}" == *YOUR_GITHUB_USER* ]]; then
+          echo "::error::norish/config.yaml still contains the YOUR_GITHUB_USER placeholder. Run scripts/set-owner.sh."
+          exit 1
+        fi
+        echo "version=${version}" >> "$GITHUB_OUTPUT"
+        echo "image=${image}" >> "$GITHUB_OUTPUT"
+        echo "norish_tag=${norish_tag}" >> "$GITHUB_OUTPUT"
+        echo "Building ${image}:${version} from norishapp/norish:${norish_tag}"
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.token }}
+
+    - name: Check whether the tag already exists
+      id: exists
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ "${{ inputs.force }}" != "true" ]] && docker manifest inspect "${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}" >/dev/null 2>&1; then
+          echo "Tag already exists, skipping build (use force to rebuild)"
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Set up QEMU
+      if: steps.exists.outputs.skip != 'true'
+      uses: docker/setup-qemu-action@v3
+
+    - name: Set up Buildx
+      if: steps.exists.outputs.skip != 'true'
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build and push
+      if: steps.exists.outputs.skip != 'true'
+      uses: docker/build-push-action@v6
+      with:
+        context: norish
+        platforms: linux/amd64,linux/arm64
+        push: true
+        provenance: false
+        tags: |
+          ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+          ${{ steps.meta.outputs.image }}:latest
+        build-args: |
+          NORISH_VERSION=${{ steps.meta.outputs.norish_tag }}
+          BUILD_VERSION=${{ steps.meta.outputs.version }}
+          BUILD_ARCH=aarch64|amd64
+        labels: |
+          io.hass.version=${{ steps.meta.outputs.version }}
+          io.hass.type=addon
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max

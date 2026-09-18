@@ -1,0 +1,16 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+bashio::log.info "Starting Redis"
+exec su-exec redis redis-server \
+    --bind 127.0.0.1 \
+    --port 6379 \
+    --protected-mode yes \
+    --dir /data/redis \
+    --appendonly yes \
+    --save "" \
+    --loglevel warning \
+    --ignore-warnings ARM64-COW-BUG
+# ARM64-COW-BUG: Redis probes for a kernel copy-on-write bug (Linux 4.14-5.3
+# era) on aarch64 and refuses to start if the probe fails. The probe gives a
+# false positive under QEMU user emulation and is irrelevant on the 6.x
+# kernels Home Assistant OS ships, so the warning is ignored.

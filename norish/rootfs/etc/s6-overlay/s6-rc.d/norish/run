@@ -1,0 +1,27 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+set -euo pipefail
+# shellcheck disable=SC1091
+source /run/norish.env
+
+PSQL="su-exec postgres psql -U postgres -h 127.0.0.1 -qAt"
+
+for _ in $(seq 1 60); do
+    su-exec postgres pg_isready -h 127.0.0.1 -q && break
+    sleep 1
+done
+su-exec postgres pg_isready -h 127.0.0.1 -q || bashio::exit.nok "PostgreSQL did not become ready"
+
+for _ in $(seq 1 30); do
+    [[ "$(redis-cli -h 127.0.0.1 ping 2>/dev/null || true)" == "PONG" ]] && break
+    sleep 1
+done
+
+if [[ "$(${PSQL} -c "SELECT 1 FROM pg_database WHERE datname = 'norish'")" != "1" ]]; then
+    bashio::log.info "Creating database norish"
+    ${PSQL} -c 'CREATE DATABASE norish' >/dev/null
+fi
+
+bashio::log.info "Starting Norish ${NORISH_UPSTREAM_VERSION:-} on port ${PORT}"
+cd /app
+exec su-exec node:node node /app/dist-server/index.mjs

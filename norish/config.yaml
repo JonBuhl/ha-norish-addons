@@ -1,0 +1,45 @@
+name: Norish
+version: "0.23.1-beta"
+slug: norish
+description: Realtime, self-hosted recipe app for families & friends (bundles PostgreSQL + Redis)
+url: https://github.com/jonbuhl/ha-norish-addons
+arch:
+  - aarch64
+  - amd64
+# The image is built by GitHub Actions in this repository (see .github/).
+# Home Assistant pulls "<image>:<version>", so version must equal the image tag.
+# For a local build on the HA host, comment out the image line.
+image: ghcr.io/jonbuhl/norish-addon
+init: false
+startup: services
+boot: auto
+hassio_api: true
+hassio_role: default
+# PostgreSQL lives inside this add-on: stop it while a backup runs so the
+# database files in the backup are consistent.
+backup: cold
+ports:
+  3000/tcp: 3000
+ports_description:
+  3000/tcp: Norish web UI
+webui: http://[HOST]:[PORT:3000]
+watchdog: http://[HOST]:[PORT:3000]/api/v1/health
+options:
+  trusted_origins: []
+  password_auth_enabled: true
+  default_locale: de
+  log_level: info
+  env_vars: []
+schema:
+  auth_url: str?
+  trusted_origins:
+    - str
+  master_key: password?
+  obscura_endpoint: str?
+  password_auth_enabled: bool
+  default_locale: str
+  enabled_locales: str?
+  log_level: list(trace|debug|info|warn|error|fatal)
+  env_vars:
+    - name: match(^[A-Z][A-Z0-9_]*$)
+      value: str

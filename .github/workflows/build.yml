@@ -1,0 +1,33 @@
+name: Build Norish add-on image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "norish/**"
+      - ".github/actions/build-image/**"
+      - ".github/workflows/build.yml"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if the tag already exists
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: build-image
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/build-image
+        with:
+          force: ${{ inputs.force || 'false' }}
+          token: ${{ secrets.GITHUB_TOKEN }}

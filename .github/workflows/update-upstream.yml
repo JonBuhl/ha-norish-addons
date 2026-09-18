@@ -1,0 +1,104 @@
+name: Track upstream Norish releases
+
+on:
+  schedule:
+    - cron: "17 4 * * *"   # daily, 04:17 UTC
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Force a specific Norish tag (e.g. v0.23.1-beta); empty = newest release
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: build-image
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      norish_tag: ${{ steps.upstream.outputs.norish_tag }}
+      obscura_tag: ${{ steps.upstream.outputs.obscura_tag }}
+      changed: ${{ steps.upstream.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine newest upstream release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCED_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${FORCED_TAG}" ]]; then
+            tag="${FORCED_TAG}"
+          else
+            # Newest non-draft release. Norish currently marks every release as
+            # pre-release (-beta), so pre-releases are included on purpose.
+            tag="$(gh api 'repos/norish-recipes/norish/releases?per_page=20' \
+                   --jq '[.[] | select(.draft | not)][0].tag_name')"
+          fi
+          if [[ -z "${tag}" || "${tag}" == "null" ]]; then
+            echo "::error::could not determine upstream tag"
+            exit 1
+          fi
+
+          # The image must exist on Docker Hub for both architectures before we
+          # reference it, otherwise the build would fail or ship a stale image.
+          if ! curl -fsSL "https://hub.docker.com/v2/repositories/norishapp/norish/tags/${tag}" \
+               | jq -e '[.images[].architecture] | (index("arm64") != null and index("amd64") != null)' >/dev/null; then
+            echo "::warning::norishapp/norish:${tag} is not yet on Docker Hub for arm64 and amd64, trying again next run"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Obscura tag pinned by that release.
+          obscura="$(curl -fsSL "https://raw.githubusercontent.com/norish-recipes/norish/${tag}/docker/obscura/pin.env" \
+                     | sed -n 's/^OBSCURA_IMAGE_TAG=//p' | tr -d '[:space:]' || true)"
+
+          current_norish="$(yq -r '.version' norish/config.yaml)"
+          current_obscura="$(yq -r '.version' norish_obscura/config.yaml)"
+          changed=false
+          if [[ "${tag#v}" != "${current_norish}" ]]; then changed=true; fi
+          if [[ -n "${obscura}" && "${obscura}" != "${current_obscura}" ]]; then changed=true; fi
+
+          echo "norish_tag=${tag}"      >> "$GITHUB_OUTPUT"
+          echo "obscura_tag=${obscura}" >> "$GITHUB_OUTPUT"
+          echo "changed=${changed}"     >> "$GITHUB_OUTPUT"
+          echo "upstream=${tag} (obscura ${obscura:-n/a}); current=${current_norish} / ${current_obscura}; changed=${changed}"
+
+  build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply version bump (working tree only)
+        run: scripts/bump.sh "${{ needs.check.outputs.norish_tag }}" "${{ needs.check.outputs.obscura_tag }}"
+      - uses: ./.github/actions/build-image
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  commit:
+    # Runs only after the image is in the registry, so Home Assistant never
+    # sees a version it cannot pull yet.
+    needs: [check, build]
+    if: needs.check.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply version bump
+        run: scripts/bump.sh "${{ needs.check.outputs.norish_tag }}" "${{ needs.check.outputs.obscura_tag }}"
+      - name: Commit and push
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Update Norish to ${{ needs.check.outputs.norish_tag }}"
+          git push
