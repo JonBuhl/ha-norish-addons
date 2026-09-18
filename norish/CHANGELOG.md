@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.1-beta-ha2
+
+- Ship `icon.png` (128x128) and `logo.png` (250x100) so the add-on shows the
+  Norish mark in the Home Assistant app store instead of the generic
+  placeholder. Both are derived from the official Norish assets
+  (`apps/web/public/android-chrome-512x512.png` and `apps/web/public/logo.svg`).
+
 ## 0.23.1-beta-ha1
 
 - Bind Norish dual-stack (`HOST=::`). The add-on port is published on IPv4 and
