@@ -1,5 +1,5 @@
 name: Norish
-version: "0.23.0-beta"
+version: "0.23.1-beta"
 slug: norish
 description: Realtime, self-hosted recipe app for families & friends (bundles PostgreSQL + Redis)
 url: https://github.com/jonbuhl/ha-norish-addons

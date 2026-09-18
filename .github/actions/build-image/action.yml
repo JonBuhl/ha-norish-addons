@@ -63,9 +63,10 @@ runs:
         platforms: linux/amd64,linux/arm64
         push: true
         provenance: false
+        # No "latest" tag on purpose: Home Assistant pulls "<image>:<version>"
+        # and a floating tag would only mislead after an out-of-order build.
         tags: |
           ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
-          ${{ steps.meta.outputs.image }}:latest
         build-args: |
           NORISH_VERSION=${{ steps.meta.outputs.norish_tag }}
           BUILD_VERSION=${{ steps.meta.outputs.version }}

@@ -35,24 +35,45 @@ jobs:
           FORCED_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
+          current_norish="$(yq -r '.version' norish/config.yaml)"
+          current_obscura="$(yq -r '.version' norish_obscura/config.yaml)"
+
           if [[ -n "${FORCED_TAG}" ]]; then
             tag="${FORCED_TAG}"
           else
-            # Newest non-draft release. Norish currently marks every release as
-            # pre-release (-beta), so pre-releases are included on purpose.
-            tag="$(gh api 'repos/norish-recipes/norish/releases?per_page=20' \
-                   --jq '[.[] | select(.draft | not)][0].tag_name')"
+            # Source of truth is the image registry, not the GitHub releases
+            # page: Norish sometimes tags a hotfix (e.g. v0.23.1-beta) and
+            # publishes its image without creating a GitHub release for it.
+            # Take the highest version tag that exists for both arm64 and
+            # amd64; "rc-*" and "latest" are ignored.
+            tag="$(curl -fsSL 'https://hub.docker.com/v2/repositories/norishapp/norish/tags?page_size=100' \
+                   | jq -r '.results[]
+                            | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.]+)?$"))
+                            | select(([.images[].architecture] | index("arm64") != null and index("amd64") != null))
+                            | .name' \
+                   | sort -V | tail -n1)"
           fi
           if [[ -z "${tag}" || "${tag}" == "null" ]]; then
             echo "::error::could not determine upstream tag"
             exit 1
           fi
 
-          # The image must exist on Docker Hub for both architectures before we
-          # reference it, otherwise the build would fail or ship a stale image.
+          # Never move backwards: if the candidate sorts below the version the
+          # add-on already ships, leave everything untouched. For the
+          # comparison a version without pre-release suffix gets a suffix that
+          # sorts after "-beta", so 0.23.1 counts as newer than 0.23.1-beta.
+          sort_key() { if [[ "$1" == *-* ]]; then echo "$1"; else echo "$1-zzzz"; fi; }
+          highest="$(printf '%s\n%s\n' "$(sort_key "${current_norish}")" "$(sort_key "${tag#v}")" | sort -V | tail -n1)"
+          if [[ -z "${FORCED_TAG}" && "${highest}" != "$(sort_key "${tag#v}")" ]]; then
+            echo "Upstream ${tag} is not newer than the current ${current_norish}, nothing to do"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A forced tag must still exist for both architectures.
           if ! curl -fsSL "https://hub.docker.com/v2/repositories/norishapp/norish/tags/${tag}" \
                | jq -e '[.images[].architecture] | (index("arm64") != null and index("amd64") != null)' >/dev/null; then
-            echo "::warning::norishapp/norish:${tag} is not yet on Docker Hub for arm64 and amd64, trying again next run"
+            echo "::warning::norishapp/norish:${tag} is not on Docker Hub for arm64 and amd64, trying again next run"
             echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -61,8 +82,6 @@ jobs:
           obscura="$(curl -fsSL "https://raw.githubusercontent.com/norish-recipes/norish/${tag}/docker/obscura/pin.env" \
                      | sed -n 's/^OBSCURA_IMAGE_TAG=//p' | tr -d '[:space:]' || true)"
 
-          current_norish="$(yq -r '.version' norish/config.yaml)"
-          current_obscura="$(yq -r '.version' norish_obscura/config.yaml)"
           changed=false
           if [[ "${tag#v}" != "${current_norish}" ]]; then changed=true; fi
           if [[ -n "${obscura}" && "${obscura}" != "${current_obscura}" ]]; then changed=true; fi

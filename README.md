@@ -16,8 +16,9 @@ Supported architectures: `aarch64` (Raspberry Pi 4/5, ODROID, ...) and `amd64`.
 
 The scheduled GitHub Actions workflow `update-upstream.yml` runs daily:
 
-1. Looks up the newest release of `norish-recipes/norish` and the Obscura tag
-   that release pins.
+1. Looks up the highest `vX.Y.Z*` tag of `norishapp/norish` on Docker Hub that
+   exists for arm64 and amd64, plus the Obscura tag that release pins. It never
+   moves to a lower version than the one currently shipped.
 2. Builds `ghcr.io/<you>/norish-addon:<version>` for arm64 and amd64.
 3. Only after the image is pushed, bumps `version` in both `config.yaml`
    files and commits to `main`.
@@ -35,13 +36,14 @@ add-on it installs itself.
    ./scripts/set-owner.sh your-github-user
    ```
 
-3. In the repository settings enable **Actions → General → Workflow
-   permissions → Read and write permissions**.
-4. Run the **Build Norish add-on image** workflow once from the Actions tab.
-5. After the first build, open the package `norish-addon` on your GitHub
-   profile → *Package settings* → *Change visibility* → **Public**. Home
-   Assistant cannot pull private images.
-6. Add the repository URL in Home Assistant and install the add-ons.
+3. Push to `main`. The **Build Norish add-on image** workflow runs
+   automatically (it can also be started from the Actions tab). The workflows
+   request their own token permissions, so the default read-only workflow
+   permissions of a new repository are sufficient.
+4. After the first build, check that the package `norish-addon` on your
+   GitHub profile is **Public**. Packages published from a public repository
+   normally are; Home Assistant cannot pull private images.
+5. Add the repository URL in Home Assistant and install the add-ons.
 
 ## Local build on the Home Assistant host
 
