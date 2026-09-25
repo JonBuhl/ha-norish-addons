@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.24.0-beta
+
+- Update Norish to [v0.24.0-beta](https://github.com/norish-recipes/norish/releases/tag/v0.24.0-beta).
+
+
 ## 0.23.1-beta-ha2
 
 - Ship `icon.png` (128x128) and `logo.png` (250x100) so the add-on shows the

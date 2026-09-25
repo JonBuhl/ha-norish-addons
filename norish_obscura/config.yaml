@@ -1,5 +1,5 @@
 name: Norish Obscura
-version: "0.2.0-norish.1"
+version: "0.2.2-norish.1"
 slug: norish_obscura
 description: Headless browser used by Norish to render recipe pages for URL imports
 url: https://github.com/jonbuhl/ha-norish-addons
