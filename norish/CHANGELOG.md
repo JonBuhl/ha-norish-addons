@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.25.1-beta
+
+- Update Norish to [v0.25.1-beta](https://github.com/norish-recipes/norish/releases/tag/v0.25.1-beta).
+
+
 ## 0.25.0-beta
 
 - Update Norish to [v0.25.0-beta](https://github.com/norish-recipes/norish/releases/tag/v0.25.0-beta).

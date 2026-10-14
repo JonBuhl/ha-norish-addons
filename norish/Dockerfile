@@ -13,7 +13,7 @@
 #
 # NORISH_VERSION is the upstream Docker tag / GitHub release tag. It is kept in
 # sync automatically by .github/workflows/update-upstream.yml.
-ARG NORISH_VERSION=v0.25.0-beta
+ARG NORISH_VERSION=v0.25.1-beta
 FROM norishapp/norish:${NORISH_VERSION}
 
 ARG NORISH_VERSION
