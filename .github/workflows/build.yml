@@ -1,10 +1,11 @@
-name: Build Norish add-on image
+name: Build add-on images
 
 on:
   push:
     branches: [main]
     paths:
       - "norish/**"
+      - "norish_obscura/**"
       - ".github/actions/build-image/**"
       - ".github/workflows/build.yml"
   workflow_dispatch:
@@ -25,9 +26,15 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        addon: [norish, norish_obscura]
     steps:
       - uses: actions/checkout@v4
+      # Each add-on skips its build when its "<image>:<version>" already exists.
       - uses: ./.github/actions/build-image
         with:
+          addon: ${{ matrix.addon }}
           force: ${{ inputs.force || 'false' }}
           token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.25.1-beta-ha1
+
+- Pass `OBSCURA_CDP_TOKEN` to Norish. The token is shared with the Norish
+  Obscura add-on via `/share/norish/obscura_cdp_token` and generated
+  automatically. Fixes URL imports with Obscura 0.2.4.
+
+
 ## 0.25.1-beta
 
 - Update Norish to [v0.25.1-beta](https://github.com/norish-recipes/norish/releases/tag/v0.25.1-beta).

@@ -70,6 +70,40 @@ else
     bashio::log.info "Using Obscura at ${OBSCURA_ENDPOINT} (install the Norish Obscura add-on for URL imports)"
 fi
 
+# --------------------------------------------------------- Obscura CDP token
+# Obscura >= 0.2.4 only listens on the add-on network with a token of at
+# least 32 characters, and Norish has to send the same value. The token is
+# shared with the Norish Obscura add-on through /share/norish: whichever
+# add-on starts first creates it (atomically, via a hard link), the other one
+# reads it. Restarting both add-ons after deleting the file rotates it.
+# An OBSCURA_CDP_TOKEN entry in env_vars overrides it (written later).
+TOKEN_DIR=/share/norish
+TOKEN_FILE="${TOKEN_DIR}/obscura_cdp_token"
+OBSCURA_CDP_TOKEN=""
+if [[ -d /share ]]; then
+    mkdir -p "${TOKEN_DIR}"
+    chmod 700 "${TOKEN_DIR}"
+    if [[ -f "${TOKEN_FILE}" ]]; then
+        OBSCURA_CDP_TOKEN="$(tr -d '[:space:]' < "${TOKEN_FILE}")"
+    fi
+    if (( ${#OBSCURA_CDP_TOKEN} < 32 )); then
+        tmp="$(mktemp "${TOKEN_DIR}/.obscura_cdp_token.XXXXXX")"
+        head -c 32 /dev/urandom | od -An -v -tx1 | tr -d ' \n' > "${tmp}"
+        chmod 600 "${tmp}"
+        if [[ -e "${TOKEN_FILE}" ]]; then
+            mv -f "${tmp}" "${TOKEN_FILE}"
+            bashio::log.warning "Replaced an invalid Obscura token in ${TOKEN_FILE}. Restart the Norish Obscura add-on."
+        elif ln "${tmp}" "${TOKEN_FILE}" 2>/dev/null; then
+            bashio::log.info "Generated a new Obscura token in ${TOKEN_FILE}"
+        fi
+        rm -f "${tmp}"
+        OBSCURA_CDP_TOKEN="$(tr -d '[:space:]' < "${TOKEN_FILE}")"
+    fi
+    bashio::log.info "Using the Obscura token from ${TOKEN_FILE}"
+else
+    bashio::log.warning "/share is not mapped, no Obscura token available. URL imports will fail."
+fi
+
 # --------------------------------------------------------------- PostgreSQL
 if [[ ! -s "${PG_DATA}/PG_VERSION" ]]; then
     bashio::log.info "Initialising PostgreSQL cluster in ${PG_DATA}"
@@ -102,6 +136,9 @@ rm -f "${PG_DATA}/postmaster.pid"
     printf 'export REDIS_URL=%q\n' "redis://127.0.0.1:6379"
     printf 'export MASTER_KEY=%q\n' "${MASTER_KEY}"
     printf 'export OBSCURA_ENDPOINT=%q\n' "${OBSCURA_ENDPOINT}"
+    if [[ -n "${OBSCURA_CDP_TOKEN}" ]]; then
+        printf 'export OBSCURA_CDP_TOKEN=%q\n' "${OBSCURA_CDP_TOKEN}"
+    fi
     printf 'export UPLOADS_DIR=%q\n' "/data/uploads"
     printf 'export YT_DLP_BIN_DIR=%q\n' "/app/bin"
     printf 'export NEXT_PUBLIC_LOG_LEVEL=%q\n' "$(bashio::config 'log_level')"

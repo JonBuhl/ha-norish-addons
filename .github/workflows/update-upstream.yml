@@ -35,8 +35,11 @@ jobs:
           FORCED_TAG: ${{ inputs.tag }}
         run: |
           set -euo pipefail
+          # Add-on versions may carry a "-haN" suffix for repo-only rebuilds,
+          # so the upstream tags are compared against the Dockerfile pins.
           current_norish="$(yq -r '.version' norish/config.yaml)"
-          current_obscura="$(yq -r '.version' norish_obscura/config.yaml)"
+          pinned_norish="$(sed -n 's/^ARG NORISH_VERSION=//p' norish/Dockerfile | head -n1)"
+          current_obscura="$(sed -n 's/^ARG OBSCURA_TAG=//p' norish_obscura/Dockerfile | head -n1)"
 
           if [[ -n "${FORCED_TAG}" ]]; then
             tag="${FORCED_TAG}"
@@ -83,24 +86,30 @@ jobs:
                      | sed -n 's/^OBSCURA_IMAGE_TAG=//p' | tr -d '[:space:]' || true)"
 
           changed=false
-          if [[ "${tag#v}" != "${current_norish}" ]]; then changed=true; fi
+          if [[ "${tag}" != "${pinned_norish}" ]]; then changed=true; fi
           if [[ -n "${obscura}" && "${obscura}" != "${current_obscura}" ]]; then changed=true; fi
 
           echo "norish_tag=${tag}"      >> "$GITHUB_OUTPUT"
           echo "obscura_tag=${obscura}" >> "$GITHUB_OUTPUT"
           echo "changed=${changed}"     >> "$GITHUB_OUTPUT"
-          echo "upstream=${tag} (obscura ${obscura:-n/a}); current=${current_norish} / ${current_obscura}; changed=${changed}"
+          echo "upstream=${tag} (obscura ${obscura:-n/a}); current=${pinned_norish} / ${current_obscura}; changed=${changed}"
 
   build:
     needs: check
     if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        addon: [norish, norish_obscura]
     steps:
       - uses: actions/checkout@v4
       - name: Apply version bump (working tree only)
         run: scripts/bump.sh "${{ needs.check.outputs.norish_tag }}" "${{ needs.check.outputs.obscura_tag }}"
+      # An add-on whose version did not change skips its build (tag exists).
       - uses: ./.github/actions/build-image
         with:
+          addon: ${{ matrix.addon }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
   commit:

@@ -29,7 +29,7 @@ upstream release.
 | `auth_url` | Public URL of Norish, used for auth callbacks and cookies. Must match what you type in the browser (IP or hostname, with port). |
 | `trusted_origins` | Additional origins you access Norish from, e.g. `https://norish.example.com` behind a reverse proxy. |
 | `master_key` | Encryption master key. Leave empty to have one generated and stored in `/data/master_key`. Set it only when migrating an existing installation. Never change it afterwards. |
-| `obscura_endpoint` | Override the Obscura websocket endpoint. Empty means the companion add-on. |
+| `obscura_endpoint` | Override the Obscura websocket endpoint. Empty means the companion add-on. With an external Obscura, set its token via `env_vars` (`OBSCURA_CDP_TOKEN`). |
 | `password_auth_enabled` | Allow e-mail + password login. |
 | `default_locale` | Default UI language, e.g. `de`, `en`, `nl`. |
 | `enabled_locales` | Comma-separated list of allowed languages; empty means all. |
@@ -84,7 +84,8 @@ uploads and the master key.
 - **Login loops or "invalid origin"**: `auth_url` does not match the URL in
   the browser. Fix it and restart.
 - **URL import fails**: the Norish Obscura add-on is not installed or not
-  running.
+  running, or it was restarted with a new token. Both add-ons share the token
+  in `/share/norish/obscura_cdp_token`; after deleting that file restart both.
 - **Update fails to pull the image**: the GitHub Actions build for that
   version may still be running, or the GHCR package is private. Check the
   Actions tab and the package visibility.

@@ -1,5 +1,5 @@
 name: Norish
-version: "0.25.1-beta"
+version: "0.25.1-beta-ha1"
 slug: norish
 description: Realtime, self-hosted recipe app for families & friends (bundles PostgreSQL + Redis)
 url: https://github.com/jonbuhl/ha-norish-addons
@@ -18,6 +18,11 @@ hassio_role: default
 # PostgreSQL lives inside this add-on: stop it while a backup runs so the
 # database files in the backup are consistent.
 backup: cold
+# The Obscura CDP token shared with the Norish Obscura add-on lives in
+# /share/norish.
+map:
+  - type: share
+    read_only: false
 ports:
   3000/tcp: 3000
 ports_description:

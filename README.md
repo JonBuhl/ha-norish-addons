@@ -8,7 +8,7 @@ the realtime self-hosted recipe app.
 | Add-on | What it is |
 | --- | --- |
 | **Norish** | Norish + PostgreSQL 17 + Redis in one container. |
-| **Norish Obscura** | Headless browser for URL imports (upstream image, unchanged). |
+| **Norish Obscura** | Headless browser for URL imports (upstream binaries plus a start script for the shared CDP token). |
 
 Supported architectures: `aarch64` (Raspberry Pi 4/5, ODROID, ...) and `amd64`.
 
@@ -19,7 +19,8 @@ The scheduled GitHub Actions workflow `update-upstream.yml` runs daily:
 1. Looks up the highest `vX.Y.Z*` tag of `norishapp/norish` on Docker Hub that
    exists for arm64 and amd64, plus the Obscura tag that release pins. It never
    moves to a lower version than the one currently shipped.
-2. Builds `ghcr.io/<you>/norish-addon:<version>` for arm64 and amd64.
+2. Builds `ghcr.io/<you>/norish-addon:<version>` and
+   `ghcr.io/<you>/norish-obscura-addon:<version>` for arm64 and amd64.
 3. Only after the image is pushed, bumps `version` in both `config.yaml`
    files and commits to `main`.
 
@@ -40,15 +41,16 @@ add-on it installs itself.
    automatically (it can also be started from the Actions tab). The workflows
    request their own token permissions, so the default read-only workflow
    permissions of a new repository are sufficient.
-4. After the first build, check that the package `norish-addon` on your
-   GitHub profile is **Public**. Packages published from a public repository
+4. After the first build, check that the packages `norish-addon` and
+   `norish-obscura-addon` on your GitHub profile are **Public**. Packages published from a public repository
    normally are; Home Assistant cannot pull private images.
 5. Add the repository URL in Home Assistant and install the add-ons.
 
 ## Local build on the Home Assistant host
 
-Copy the `norish` folder to `/addons/norish` (Samba or SSH add-on), comment
-out the `image:` line in its `config.yaml` and install it as a local add-on.
+Copy the `norish` (and `norish_obscura`) folder to `/addons/` (Samba or SSH
+add-on), comment out the `image:` line in its `config.yaml` and install it as
+a local add-on.
 Supervisor then builds the image on the device (a few minutes on a Pi 5).
 
 ## Versioning
