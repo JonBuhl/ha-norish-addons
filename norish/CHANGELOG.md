@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0-beta
+
+- Update Norish to [v0.26.0-beta](https://github.com/norish-recipes/norish/releases/tag/v0.26.0-beta).
+
+
 ## 0.25.1-beta-ha1
 
 - Pass `OBSCURA_CDP_TOKEN` to Norish. The token is shared with the Norish

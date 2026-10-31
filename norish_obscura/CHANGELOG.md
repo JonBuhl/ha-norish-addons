@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.5-norish.1
+
+- Track `norishapp/obscura:0.2.5-norish.1` as pinned by Norish v0.26.0-beta.
+
+
 ## 0.2.4-norish.1-ha1
 
 - Build an own image from the `norishapp/obscura:0.2.4-norish.1` binaries so

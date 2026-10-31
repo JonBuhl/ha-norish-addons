@@ -11,7 +11,7 @@
 #
 # OBSCURA_TAG is the upstream image tag pinned by the current Norish release.
 # It is kept in sync automatically by .github/workflows/update-upstream.yml.
-ARG OBSCURA_TAG=0.2.4-norish.1
+ARG OBSCURA_TAG=0.2.5-norish.1
 FROM norishapp/obscura:${OBSCURA_TAG} AS obscura
 
 FROM debian:12-slim
