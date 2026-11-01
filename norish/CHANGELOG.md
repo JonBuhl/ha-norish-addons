@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.26.0-beta-ha1
+
+- Start the server the way upstream 0.26 does: `node --import tsx
+  /app/apps/web/server/index.ts`. Norish 0.26 replaced the bundled
+  `/app/dist-server/index.mjs` with a TypeScript server, so the add-on
+  crashed in a loop with `Cannot find module` after updating. The old path
+  stays as a fallback for pre-0.26 images.
+
 ## 0.26.0-beta
 
 - Update Norish to [v0.26.0-beta](https://github.com/norish-recipes/norish/releases/tag/v0.26.0-beta).

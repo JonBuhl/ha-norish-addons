@@ -24,4 +24,11 @@ fi
 
 bashio::log.info "Starting Norish ${NORISH_UPSTREAM_VERSION:-} on port ${PORT}"
 cd /app
+# Norish >= 0.26 ships the custom server as TypeScript and starts it through
+# tsx (see the upstream Dockerfile CMD). Older images bundled the compiled
+# server as /app/dist-server/index.mjs; keep that as the fallback so the
+# add-on runs on both layouts.
+if [[ -f /app/apps/web/server/index.ts ]]; then
+    exec su-exec node:node node --import tsx /app/apps/web/server/index.ts
+fi
 exec su-exec node:node node /app/dist-server/index.mjs
