@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.1-beta
+
+- Update Norish to [v0.26.1-beta](https://github.com/norish-recipes/norish/releases/tag/v0.26.1-beta).
+
+
 ## 0.26.0-beta-ha1
 
 - Start the server the way upstream 0.26 does: `node --import tsx
